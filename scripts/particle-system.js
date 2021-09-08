@@ -1,33 +1,43 @@
 'use strict'
 
-const _ParticleSystem = {
-  isDirectionArray(arr) {
-    if( Array.isArray(arr) && arr.length >= 3 ) {
-      for(let i = 0; i < 3; i++) {
-        if(typeof arr[i] != 'number') {
-          return false;
-        }
+const _ParticleSystem = {};
+
+_ParticleSystem.isDirectionArray = function(arr) {
+  if( Array.isArray(arr) && arr.length >= 3 ) {
+    for(let i = 0; i < 3; i++) {
+      if(typeof arr[i] != 'number') {
+        return false;
       }
-      return true;
-    } else {
-      return false;
     }
-  },
-  randomiseDirection() {
-    let valueX = (Math.random() - 0.5) * 2;
-    let valueY = (Math.random() - 0.5) * 2;
-    let valueZ = (Math.random() - 0.5) * 2;
-
-    const multiplier = 
-        1 / Math.max(Math.abs(valueX), Math.abs(valueY), Math.abs(valueZ));
-
-    return [valueX * multiplier,
-            valueY * multiplier,
-            valueZ * multiplier];
+    return true;
+  } else {
+    return false;
   }
-};
+}
+
+_ParticleSystem.adjustDirectionArray = function(arr) {
+  const multiplier =
+      1 / Math.max( Math.abs(arr[0]), Math.abs(arr[1]), Math.abs(arr[2]) );
+
+  return [
+    arr[0] * multiplier,
+    arr[1] * multiplier,
+    arr[2] * multiplier,
+  ]
+}
+
+_ParticleSystem.randomiseDirection = function() {
+  const directions = [
+    (Math.random() - 0.5) * 2,
+    (Math.random() - 0.5) * 2,
+    (Math.random() - 0.5) * 2
+  ];
+
+  return adjustDirectionArray(directions); 
+}
 
 _ParticleSystem.defaultValues = {
+  amount: 1000,
   direction: [1, 1, 1],
   lifetime: 3000,
   size: 1,
@@ -36,7 +46,6 @@ _ParticleSystem.defaultValues = {
 }
 
 AFRAME.registerComponent('particle', {
-  // all properties are available through this['data']['propertyName']
   schema: {
     direction: {type: 'array', default: _ParticleSystem.defaultValues.direction},
     lifetime: {type: 'number', default: _ParticleSystem.defaultValues.lifetime},
@@ -48,56 +57,59 @@ AFRAME.registerComponent('particle', {
     for(let i = 0; i < this.data.direction.length; i++) {
       this.data.direction[i] = +this.data.direction[i];
     }
+    this.data.direction = _ParticleSystem.adjustDirectionArray(this.data.direction);
     this.data.container = this.el;
     let p = new Particle(this.data);
     p.startMoving();
   }
 });
 
+
 /* 
  *  Time Tracker: 6 hours
  *
- *  Minimum Viable Functionality:
- *  + You can define particle lifetime
- *  + Particle deletes after defined amount of ms passed
+ *  Minimum Viable Functionality for ParticleSystem:
+ *  - You can create particle systems with the ability to define these settings:
+ *       - particle amount
+ *       - lifetime of each particle*
+ *       - particle texture*
+ *       - particle size in conventional units*
+ *       - particle flight speed in conventional units*
+ *       - direction of particle flight*
+ *       - start and reset particle system
+ *       - pause and resume particle system
+ *     *The parameter is the same for each particle in the particle system
  * 
- *  + You can define particle flight direction
- *  + Particle can fly in the defined direction
- * 
- *  + You can define particle flight speed
- *  + Particle flies defined amount of units per second
- * 
- *  + You can define particle size
- *  + Particles size is equal to the defined value multiplied by particle's initial
- *    size
- * 
- *  - You can randomise all parameters written above
+ *  - You can randomise all MVF particle parameters
  *      - How will it work?
  * 
- *  + You can define particle texture
- *  + Particle system is implemented into A-Frame as a component
- *
- *  Questions:
- *  1) Each ParticleSystem class is for creating and adjusting one particle or bunch
- *     of particles?
- *  2) Which methods and variables are intended for incapsulation and which are not?
- *     How to incapsulate them?
- *
- *  Answers:
- *  1) If we create an object for each particle, we have amount of objects equal to
- *     amount of particles in the scene. If we create an object for each particle
- *     system and define each particle as a property of this object or unite all of
- *     them in one array, we have only one object. I suppose that performance would
- *     be a way better if we use the second method.
- *     
- *     upd: I discussed the matter with a more experienced developer and he said that
- *     there should be no big difference in performance and suggested to create two
- *     separate classes: Particle for settings and methods and ParticleSystem for
- *     creating and operating particle systems using Particle class. 
- *  2)
- *
+ *  - How a particle system works?
+ *    - It creates a particle via Particle class and adds one unit to the value
+ *      that stores the total amount of particles in the system. When the variable
+ *      amount is equal or exceeds the defined limit, the system stops spawning new
+ *      particles. When the elder particles delete, they decrease the variable
+ *      value so new particles could be spawned.
+ *    - There should be a limit for amount of particles spawned per one unit of time
+ *      within the totally empty system. It is needed to avoid performance problems
+ *      and a poor visual attractiveness. 
+ *    - A lifetime, a texture, a size, a flight speed and a direction variables
+ *      are passed to the Particle class and the defined values are the same for
+ *      each particle in the system. It is inconvenient but it is the basis for
+ *      individual adjusting function, which will be implemented in the future.
+ *      I work according to AGILE :)
+ *    - When we start particle system, ParticleSystem class starts spawning particles
+ *      according to the defined settings and restrictions.
+ *    - When we pause particle system, isMoving value of each particle is changed 
+ *      to false. The timer of each particle writes the amount of ms passed in
+ *      a separate function.
+ *    - When we resume particle system, isMoving value of each particle is changed
+ *      to true. The timer is defined as a difference of particle lifetime and
+ *      amount of seconds passed.
+ *    - When we stop particle system, all existing particles are deleted and all
+ *      the ParticleSystem variables are set to the default values.
+ * 
  *  Goals for the next week:
- *  + Implement at least 4 points from the MVF list
+ *  - Implement at least 6 points from the MVF list
  */
 
 
@@ -115,9 +127,7 @@ AFRAME.registerComponent('particle', {
  *  
  */
 
-class ParticleSystem {
 
-}
 
 class Particle {
   constructor(settings) {
