@@ -45,6 +45,8 @@ _ParticleSystem.defaultValues = {
   texture: 'https://hsto.org/getpro/moikrug/uploads/company/100/007/265/4/logo/medium_4a47a0db6e60853dedfcfdf08a5ca249.png'
 }
 
+_ParticleSystem.particlesPerSecond = 5; // Max value is 250
+
 AFRAME.registerComponent('particle', {
   schema: {
     direction: {type: 'array', default: _ParticleSystem.defaultValues.direction},
@@ -64,9 +66,29 @@ AFRAME.registerComponent('particle', {
   }
 });
 
+AFRAME.registerComponent('particle-system', {
+  schema: {
+    limit: {type: 'number', default: _ParticleSystem.defaultValues.amount},
+    direction: {type: 'array', default: _ParticleSystem.defaultValues.direction},
+    lifetime: {type: 'number', default: _ParticleSystem.defaultValues.lifetime},
+    size: {type: 'number', default: _ParticleSystem.defaultValues.size},
+    speed: {type: 'number', default: _ParticleSystem.defaultValues.speed},
+    texture: {type: 'string', default: _ParticleSystem.defaultValues.texture}
+  },
+  init() {
+    for(let i = 0; i < this.data.direction.length; i++) {
+      this.data.direction[i] = +this.data.direction[i];
+    }
+    this.data.direction = _ParticleSystem.adjustDirectionArray(this.data.direction);
+    this.data.container = this.el;
+    let PS = new ParticleSystem(this.data);
+    PS.start();
+  }
+});
+
 
 /* 
- *  Time Tracker: 6 hours
+ *  Time Tracker: 10 hours
  *
  *  Minimum Viable Functionality for ParticleSystem:
  *  - You can create particle systems with the ability to define these settings:
@@ -91,7 +113,15 @@ AFRAME.registerComponent('particle', {
  *      value so new particles could be spawned.
  *    - There should be a limit for amount of particles spawned per one unit of time
  *      within the totally empty system. It is needed to avoid performance problems
- *      and a poor visual attractiveness. 
+ *      and a poor visual attractiveness.
+ *        - How does it work?
+ *          - There is a variable that contains an amount of time that has passed since
+ *            the last particle creation. While this value is less than defined
+ *            minimum, creation of particles is blocked. When the value exceeds,
+ *            the restriction is canceled
+ *          - Defined minimum is presented as an amount of particles that could
+ *            be spawned in one second. The script converts it to amount of ms
+ *            between particle creation.
  *    - A lifetime, a texture, a size, a flight speed and a direction variables
  *      are passed to the Particle class and the defined values are the same for
  *      each particle in the system. It is inconvenient but it is the basis for
@@ -127,10 +157,41 @@ AFRAME.registerComponent('particle', {
  *  
  */
 
-
+class ParticleSystem {
+  constructor(settings) {
+    console.log(settings);
+    this.settings = settings;
+    this.settings.ParticleSystem = this;
+    this.limit = settings.limit;
+    this.amount = 0;
+    this.isWorking = false;
+    this.cooldown = 1000 / _ParticleSystem.particlesPerSecond;
+    this.spawnTime = 0;
+  }
+  start() {
+    this.isWorking = true;
+    requestAnimationFrame( () => {
+      this.working();
+    });
+  }
+  working() {
+    if(this.amount < this.limit && new Date - this.spawnTime >= this.cooldown) {
+      let p = new Particle(this.settings);
+      p.startMoving();
+      this.spawnTime = new Date;
+      this.amount++;
+    }
+    if(this.isWorking) {
+      requestAnimationFrame( () => {
+        this.working();
+      });
+    }
+  }
+}
 
 class Particle {
   constructor(settings) {
+    this.ParticleSystem = settings.ParticleSystem;
     this.container = settings.container;
     this.HTMLElement = undefined; // It is defined in createParticle function
 
@@ -173,9 +234,9 @@ class Particle {
   }
 
   startMoving() {
-    this.isMoving = true;
-    this.startTime = new Date;
-    requestAnimationFrame( () => { this.particleMoving() } );
+      this.isMoving = true;
+      this.startTime = new Date;
+      requestAnimationFrame( () => { this.particleMoving() } );
   }
 
   particleMoving() {
@@ -206,6 +267,7 @@ class Particle {
     this.isMoving = false;
     cancelAnimationFrame(this.animationID);
     this.HTMLElement.remove();
+    this.ParticleSystem.amount--;
   }
 }
 
