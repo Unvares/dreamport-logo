@@ -69,56 +69,22 @@ AFRAME.registerComponent('particle-system', {
 
 
 /* 
- *  Time Tracker: 10 hours
+ *  Time Tracker: 16 hours
  *
- *  Minimum Viable Functionality for ParticleSystem:
- *  + You can create particle systems with the ability to define these settings:
- *       + particle amount
- *       + lifetime of each particle*
- *       + particle texture*
- *       + particle size in conventional units*
- *       + particle flight speed in conventional units*
- *       + direction of particle flight*
- *       + start and reset particle system
- *       + pause and resume particle system
- *     *The parameter is the same for each particle in the particle system
+ *  Minimum Viable Functionality (MVF) parameters for ParticleSystem:
+ *      + particle amount
+ *      + lifetime of each particle*
+ *      + particle size in conventional units*
+ *      + particle flight speed in conventional units*
+ *      + direction of particle flight*
+ *  *The parameter is the same for each particle in the particle system
  * 
  *  - You can randomise all MVF particle parameters
- *        - How will it work?
+ *      - How should it work?
+ *          - you can define 'randomise' property and give it randomisation
+ *            range and randomised property name as values.
+ *          - direction property is random by default
  * 
- *  - How a particle system works?
- *      + It creates a particle via Particle class and adds one unit to the value
- *        that stores the total amount of particles in the system. When the variable
- *        amount is equal or exceeds the defined limit, the system stops spawning new
- *        particles. When the elder particles delete, they decrease the variable
- *        value so new particles could be spawned.
- *      + There should be a limit for amount of particles spawned per one unit of time
- *        within the totally empty system. It is needed to avoid performance problems
- *        and a poor visual attractiveness.
- *          + How does it work?
- *               + There is a variable that contains an amount of time that has passed since
- *                 the last particle creation. While this value is less than defined
- *                 minimum, creation of particles is blocked. When the value exceeds,
- *                 the restriction is canceled
- *               + Defined minimum is presented as an amount of particles that could
- *                 be spawned in one second. The script converts it to amount of ms
- *                 between particle creation.
- *      + A lifetime, a texture, a size, a flight speed and a direction variables
- *        are passed to the Particle class and the defined values are the same for
- *        each particle in the system. It is inconvenient but it is the basis for
- *        individual adjusting function, which will be implemented in the future.
- *        I work according to AGILE :)
- *      + When we start particle system, ParticleSystem class starts spawning particles
- *        according to the defined settings and restrictions.
- *      + When we pause particle system, each particle pauses its movement and remembers
- *        the amount of time left for living
- *      - When we resume particle system, The timer is defined as a difference of particle lifetime and
- *        amount of seconds passed.
- *      - When we stop particle system, all existing particles are deleted and all
- *        the ParticleSystem variables are set to the default values.
- * 
- *  Goals for the next week:
- *  - Implement at least 6 points from the MVF list
  */
 
 
@@ -253,9 +219,9 @@ class Particle {
       particlePosition.z += this.direction[2] * this.speed / 60;
 
       /*  requestAnimationFrame()  is called every frame (approximately 60 times per
-      *  second), so we need to divide this.speed by 60 to make the particle move
-      *  defined amount of units in one second
-      */
+       *  second), so we need to divide this.speed by 60 to make the particle move
+       *  defined amount of units in one second
+       */
 
       this.HTMLElement.setAttribute(
           'position', `${particlePosition.x} ${particlePosition.y} ${particlePosition.z}`);
