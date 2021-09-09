@@ -47,25 +47,6 @@ _ParticleSystem.defaultValues = {
 
 _ParticleSystem.particlesPerSecond = 5; // Max value is 250
 
-AFRAME.registerComponent('particle', {
-  schema: {
-    direction: {type: 'array', default: _ParticleSystem.defaultValues.direction},
-    lifetime: {type: 'number', default: _ParticleSystem.defaultValues.lifetime},
-    size: {type: 'number', default: _ParticleSystem.defaultValues.size},
-    speed: {type: 'number', default: _ParticleSystem.defaultValues.speed},
-    texture: {type: 'string', default: _ParticleSystem.defaultValues.texture}
-  },
-  init() {
-    for(let i = 0; i < this.data.direction.length; i++) {
-      this.data.direction[i] = +this.data.direction[i];
-    }
-    this.data.direction = _ParticleSystem.adjustDirectionArray(this.data.direction);
-    this.data.container = this.el;
-    let p = new Particle(this.data);
-    p.startMoving();
-  }
-});
-
 AFRAME.registerComponent('particle-system', {
   schema: {
     limit: {type: 'number', default: _ParticleSystem.defaultValues.amount},
@@ -91,52 +72,50 @@ AFRAME.registerComponent('particle-system', {
  *  Time Tracker: 10 hours
  *
  *  Minimum Viable Functionality for ParticleSystem:
- *  - You can create particle systems with the ability to define these settings:
- *       - particle amount
- *       - lifetime of each particle*
- *       - particle texture*
- *       - particle size in conventional units*
- *       - particle flight speed in conventional units*
- *       - direction of particle flight*
- *       - start and reset particle system
- *       - pause and resume particle system
+ *  + You can create particle systems with the ability to define these settings:
+ *       + particle amount
+ *       + lifetime of each particle*
+ *       + particle texture*
+ *       + particle size in conventional units*
+ *       + particle flight speed in conventional units*
+ *       + direction of particle flight*
+ *       + start and reset particle system
+ *       + pause and resume particle system
  *     *The parameter is the same for each particle in the particle system
  * 
  *  - You can randomise all MVF particle parameters
- *      - How will it work?
+ *        - How will it work?
  * 
  *  - How a particle system works?
- *    - It creates a particle via Particle class and adds one unit to the value
- *      that stores the total amount of particles in the system. When the variable
- *      amount is equal or exceeds the defined limit, the system stops spawning new
- *      particles. When the elder particles delete, they decrease the variable
- *      value so new particles could be spawned.
- *    - There should be a limit for amount of particles spawned per one unit of time
- *      within the totally empty system. It is needed to avoid performance problems
- *      and a poor visual attractiveness.
- *        - How does it work?
- *          - There is a variable that contains an amount of time that has passed since
- *            the last particle creation. While this value is less than defined
- *            minimum, creation of particles is blocked. When the value exceeds,
- *            the restriction is canceled
- *          - Defined minimum is presented as an amount of particles that could
- *            be spawned in one second. The script converts it to amount of ms
- *            between particle creation.
- *    - A lifetime, a texture, a size, a flight speed and a direction variables
- *      are passed to the Particle class and the defined values are the same for
- *      each particle in the system. It is inconvenient but it is the basis for
- *      individual adjusting function, which will be implemented in the future.
- *      I work according to AGILE :)
- *    - When we start particle system, ParticleSystem class starts spawning particles
- *      according to the defined settings and restrictions.
- *    - When we pause particle system, isMoving value of each particle is changed 
- *      to false. The timer of each particle writes the amount of ms passed in
- *      a separate function.
- *    - When we resume particle system, isMoving value of each particle is changed
- *      to true. The timer is defined as a difference of particle lifetime and
- *      amount of seconds passed.
- *    - When we stop particle system, all existing particles are deleted and all
- *      the ParticleSystem variables are set to the default values.
+ *      + It creates a particle via Particle class and adds one unit to the value
+ *        that stores the total amount of particles in the system. When the variable
+ *        amount is equal or exceeds the defined limit, the system stops spawning new
+ *        particles. When the elder particles delete, they decrease the variable
+ *        value so new particles could be spawned.
+ *      + There should be a limit for amount of particles spawned per one unit of time
+ *        within the totally empty system. It is needed to avoid performance problems
+ *        and a poor visual attractiveness.
+ *          + How does it work?
+ *               + There is a variable that contains an amount of time that has passed since
+ *                 the last particle creation. While this value is less than defined
+ *                 minimum, creation of particles is blocked. When the value exceeds,
+ *                 the restriction is canceled
+ *               + Defined minimum is presented as an amount of particles that could
+ *                 be spawned in one second. The script converts it to amount of ms
+ *                 between particle creation.
+ *      + A lifetime, a texture, a size, a flight speed and a direction variables
+ *        are passed to the Particle class and the defined values are the same for
+ *        each particle in the system. It is inconvenient but it is the basis for
+ *        individual adjusting function, which will be implemented in the future.
+ *        I work according to AGILE :)
+ *      + When we start particle system, ParticleSystem class starts spawning particles
+ *        according to the defined settings and restrictions.
+ *      + When we pause particle system, each particle pauses its movement and remembers
+ *        the amount of time left for living
+ *      - When we resume particle system, The timer is defined as a difference of particle lifetime and
+ *        amount of seconds passed.
+ *      - When we stop particle system, all existing particles are deleted and all
+ *        the ParticleSystem variables are set to the default values.
  * 
  *  Goals for the next week:
  *  - Implement at least 6 points from the MVF list
@@ -159,21 +138,24 @@ AFRAME.registerComponent('particle-system', {
 
 class ParticleSystem {
   constructor(settings) {
-    console.log(settings);
     this.settings = settings;
     this.settings.ParticleSystem = this;
+    this.container = settings.container;
     this.limit = settings.limit;
     this.amount = 0;
     this.isWorking = false;
     this.cooldown = 1000 / _ParticleSystem.particlesPerSecond;
     this.spawnTime = 0;
+    this.animationID = undefined; // It is defined in start(), working() and resume()
   }
+
   start() {
     this.isWorking = true;
-    requestAnimationFrame( () => {
+    this.animationID = requestAnimationFrame( () => {
       this.working();
     });
   }
+
   working() {
     if(this.amount < this.limit && new Date - this.spawnTime >= this.cooldown) {
       let p = new Particle(this.settings);
@@ -182,11 +164,34 @@ class ParticleSystem {
       this.amount++;
     }
     if(this.isWorking) {
-      requestAnimationFrame( () => {
+      this.animationID = requestAnimationFrame( () => {
         this.working();
       });
     }
   }
+
+  pause() {
+    this.isWorking = false;
+  }
+
+  resume() {
+    this.isWorking = true;
+    this.animationID = requestAnimationFrame( () => {
+      this.working();
+    });
+  }
+
+  reset(){
+    cancelAnimationFrame(this.animationID);
+    this.isWorking = false;
+    this.amount = 0;
+    this.spawnTime = 0;
+
+    while(this.container.firstChild) {
+      this.container.firstChild.remove();
+    }
+  }
+
 }
 
 class Particle {
@@ -240,24 +245,30 @@ class Particle {
   }
 
   particleMoving() {
-    const particlePosition = this.HTMLElement.getAttribute('position');
+    if(this.ParticleSystem.isWorking) {
+      const particlePosition = this.HTMLElement.getAttribute('position');
 
-    particlePosition.x += this.direction[0] * this.speed / 60;
-    particlePosition.y += this.direction[1] * this.speed / 60;
-    particlePosition.z += this.direction[2] * this.speed / 60;
+      particlePosition.x += this.direction[0] * this.speed / 60;
+      particlePosition.y += this.direction[1] * this.speed / 60;
+      particlePosition.z += this.direction[2] * this.speed / 60;
 
-    /*  requestAnimationFrame()  is called every frame (approximately 60 times per
-     *  second), so we need to divide this.speed by 60 to make the particle move
-     *  defined amount of units in one second
-     */
+      /*  requestAnimationFrame()  is called every frame (approximately 60 times per
+      *  second), so we need to divide this.speed by 60 to make the particle move
+      *  defined amount of units in one second
+      */
 
-    this.HTMLElement.setAttribute(
-        'position', `${particlePosition.x} ${particlePosition.y} ${particlePosition.z}`);
+      this.HTMLElement.setAttribute(
+          'position', `${particlePosition.x} ${particlePosition.y} ${particlePosition.z}`);
 
-    if(new Date - this.startTime >= this.lifetime) {
-      this.stopMoving();
+      this.lifeDuration = new Date - this.startTime;
+
+      if(new Date - this.startTime >= this.lifetime) {
+        this.stopMoving();
+      }
+    } else {
+      this.startTime = new Date - this.lifeDuration;
     }
-
+    
     if(this.isMoving == true) {
       this.animationID = requestAnimationFrame( () => { this.particleMoving() } );
     }
